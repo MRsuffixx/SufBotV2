@@ -8,7 +8,7 @@ COPY package.json package-lock.json* ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/database/package.json packages/database/
 COPY apps/bot/package.json apps/bot/
-RUN npm ci --no-audit --no-fund
+RUN npm ci --no-audit --no-fund --include=dev
 
 # ----- Stage 2: build TypeScript and generate Prisma client -----
 FROM deps AS build

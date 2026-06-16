@@ -20,18 +20,25 @@ COPY apps/web/package.json ./apps/web/
 # Install all workspace dependencies (dev deps are required for the
 # Next build).  npm workspaces hoist everything to the root
 # `node_modules`; the per-workspace node_modules are NOT created.
-RUN npm install --no-audit --no-fund
+# `NODE_ENV=production` is set above, so we must explicitly opt back
+# in to devDependencies for this step.
+RUN npm install --no-audit --no-fund --include=dev
 
 # Build the shared and database packages first (they are runtime deps
-# of the web app via the published artifacts).
+# of the web app via the published artifacts).  The TypeScript and
+# Next.js binaries live in the hoisted `/repo/node_modules/.bin/`.
+# Prisma must be generated before the database package's TypeScript
+# can resolve the generated client types.
 COPY packages/shared ./packages/shared
 COPY packages/database ./packages/database
-RUN npm run build --workspace=@bot/shared \
- && npm run build --workspace=@bot/database
+RUN npm run db:generate
+RUN ./node_modules/.bin/tsc -b packages/shared packages/database
 
 # Copy the web app source and build it
 COPY apps/web ./apps/web
-RUN npm run build --workspace=@bot/web
+RUN ./node_modules/.bin/tsc -b apps/web
+# `next build` produces the production bundle that the runtime serves.
+RUN cd apps/web && ../../node_modules/.bin/next build
 
 # ---------------------------------------------------------------------------
 # Development stage — used by docker-compose.dev.yml.  Inherits the full
