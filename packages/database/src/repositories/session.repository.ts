@@ -7,6 +7,12 @@ export interface CreateSessionInput {
   userAgent?: string | null;
   ip?: string | null;
   ttlMs: number;
+  /**
+   * Encrypted Discord access token (base64).  Stored as-is; the web app
+   * is responsible for encryption with a key derived from SESSION_SECRET.
+   */
+  accessTokenEnc?: string | null;
+  accessTokenExpiresAt?: Date | null;
 }
 
 export interface CreatedSession {
@@ -39,6 +45,8 @@ export const sessionRepository = {
         userAgent: input.userAgent ?? null,
         ipHash: hashIp(input.ip),
         expiresAt: new Date(Date.now() + input.ttlMs),
+        accessTokenEnc: input.accessTokenEnc ?? null,
+        accessTokenExpiresAt: input.accessTokenExpiresAt ?? null,
       },
     });
     return { session, token };
@@ -53,6 +61,19 @@ export const sessionRepository = {
       return null;
     }
     return session;
+  },
+
+  async updateAccessToken(
+    sessionId: string,
+    data: { accessTokenEnc: string; accessTokenExpiresAt: Date },
+  ): Promise<void> {
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: {
+        accessTokenEnc: data.accessTokenEnc,
+        accessTokenExpiresAt: data.accessTokenExpiresAt,
+      },
+    });
   },
 
   async deleteByToken(token: string): Promise<void> {

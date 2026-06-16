@@ -31,6 +31,17 @@ export const BotEnvSchema = z.object({
   DATABASE_URL: z.string().url(),
   BOT_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
   BOT_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(10_000),
+  /**
+   * Port for the internal HTTP API the dashboard reads from.  Set to 0 to
+   * disable the API.  When disabled, the dashboard will show stale data and
+   * bot stats will be unavailable.
+   */
+  BOT_API_PORT: z.coerce.number().int().min(0).max(65535).default(0),
+  /**
+   * Shared secret required by the internal API.  Must match the value the
+   * dashboard uses; otherwise the dashboard cannot reach the bot.
+   */
+  INTERNAL_API_TOKEN: z.string().min(16).optional(),
 });
 
 export type BotEnv = z.infer<typeof BotEnvSchema>;

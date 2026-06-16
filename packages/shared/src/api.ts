@@ -30,8 +30,22 @@ export const GuildOverviewResponseSchema = z.object({
   memberCount: z.number().int().nonnegative(),
   botLatencyMs: z.number().int().nonnegative(),
   uptimeSeconds: z.number().int().nonnegative(),
+  textChannels: z
+    .array(
+      z.object({
+        id: SnowflakeSchema,
+        name: z.string(),
+      }),
+    )
+    .optional(),
 });
 export type GuildOverviewResponse = z.infer<typeof GuildOverviewResponseSchema>;
+
+export const TextChannelSchema = z.object({
+  id: SnowflakeSchema,
+  name: z.string(),
+});
+export type TextChannel = z.infer<typeof TextChannelSchema>;
 
 export const BotStatsResponseSchema = z.object({
   totalGuilds: z.number().int().nonnegative(),

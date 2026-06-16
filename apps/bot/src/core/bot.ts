@@ -8,6 +8,7 @@ import { getLogger, setLogger, Logger } from '../utils/logger.js';
 import { loadEnv, type BotEnv } from '../config/env.js';
 import { loadCommands, loadEvents, loadModules } from './loader.js';
 import { registerDispatcher } from './dispatcher.js';
+import { startInternalApi } from '../api/server.js';
 import {
   auditService,
   botStatsService,
@@ -99,7 +100,15 @@ export async function startBot(opts: BootOptions = {}): Promise<() => Promise<vo
     guilds: client.guilds.cache.size,
   });
 
-  // 6. Return a shutdown hook.
+  // 6. Start the internal HTTP API consumed by the dashboard.
+  const internalApi = startInternalApi({
+    container,
+    port: env.BOT_API_PORT,
+    token: env.INTERNAL_API_TOKEN ?? '',
+    logger,
+  });
+
+  // 7. Return a shutdown hook.
   return async function shutdown(): Promise<void> {
     logger.info('Shutting down');
     try {
@@ -110,6 +119,9 @@ export async function startBot(opts: BootOptions = {}): Promise<() => Promise<vo
             logger.error(`Module "${m.id}" shutdown failed`, err),
           );
         }
+      }
+      if (internalApi) {
+        await new Promise<void>((resolve) => internalApi.server.close(() => resolve()));
       }
       await client.destroy();
     } finally {

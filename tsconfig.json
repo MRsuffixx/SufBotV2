@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/shared" },
     { "path": "packages/database" },
-    { "path": "apps/bot" }
+    { "path": "apps/bot" },
+    { "path": "apps/web" }
   ]
 }

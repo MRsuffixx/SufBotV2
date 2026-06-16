@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+.dark body {
+  @apply bg-slate-950 text-slate-100;
+}
+
+/* Dark mode is toggled by setting the `.dark` class on <html> from a
+ * client component.  We default to honouring the user's system
+ * preference to avoid a flash of light theme. */
+@media (prefers-color-scheme: dark) {
+  html:not(.light) body {
+    @apply bg-slate-950 text-slate-100;
+  }
+}

@@ -12,13 +12,25 @@
     "clean": "rm -rf packages/*/dist apps/*/dist packages/*/.tsbuildinfo apps/*/.tsbuildinfo",
     "dev:bot": "npm run dev --workspace apps/bot",
     "dev:web": "npm run dev --workspace apps/web",
+    "dev": "npm run dev:bot & npm run dev:web",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "tsc -b --noEmit",
     "db:generate": "npm run db:generate --workspace packages/database",
     "db:migrate": "npm run db:migrate --workspace packages/database",
     "db:deploy": "npm run db:deploy --workspace packages/database",
-    "db:studio": "npm run db:studio --workspace packages/database"
+    "db:studio": "npm run db:studio --workspace packages/database",
+    "db:reset": "docker compose down -v postgres && docker compose up -d postgres && npm run db:deploy",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:dev:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up",
+    "docker:dev:build": "docker compose -f docker-compose.yml -f docker-compose.dev.yml build",
+    "healthcheck": "bash scripts/healthcheck.sh",
+    "prisma:migrate": "bash scripts/prisma-migrate.sh",
+    "start:bot": "npm run start --workspace apps/bot",
+    "start:web": "npm run start --workspace apps/web"
   },
   "engines": {
     "node": ">=20.0.0"

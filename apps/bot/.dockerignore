@@ -1,0 +1,12 @@
+dist
+node_modules
+coverage
+*.log
+.env
+.env.local
+.env.*.local
+logs
+.DS_Store
+.vscode
+.idea
+src/**/*.test.ts

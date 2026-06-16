@@ -1,0 +1,106 @@
+# Docker Compose for the Discord bot ecosystem.
+#
+# Usage:
+#   docker compose up -d --build         # build images and start all services
+#   docker compose logs -f               # follow logs
+#   docker compose down                  # stop everything
+#   docker compose down -v               # stop and remove volumes (DESTROYS DATA)
+#
+# All services share a private network; the database is never exposed
+# publicly.  Only the web dashboard listens on a host port.
+
+name: discord-bot-ecosystem
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-discord_bot}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-discord_bot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - internal
+    # Database is NOT exposed on the host — it is reachable only from the
+    # internal Docker network.
+
+  bot:
+    build:
+      context: .
+      dockerfile: apps/bot/Dockerfile
+    container_name: bot-discord
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-discord_bot}?schema=public
+      DISCORD_TOKEN: ${DISCORD_TOKEN}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_BOT_CLIENT_SECRET: ${DISCORD_BOT_CLIENT_SECRET:-}
+      DEV_GUILD_IDS: ${DEV_GUILD_IDS:-}
+      BOT_API_PORT: ${BOT_API_PORT:-3001}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+      BOT_RATE_LIMIT_MAX: ${BOT_RATE_LIMIT_MAX:-5}
+      BOT_RATE_LIMIT_WINDOW_MS: ${BOT_RATE_LIMIT_WINDOW_MS:-10000}
+    volumes:
+      - bot-logs:/app/logs
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/api/bot/stats"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: bot-web
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      bot:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-discord_bot}?schema=public
+      WEB_BASE_URL: ${WEB_BASE_URL:-http://localhost:3000}
+      SESSION_SECRET: ${SESSION_SECRET}
+      DISCORD_WEB_CLIENT_ID: ${DISCORD_WEB_CLIENT_ID}
+      DISCORD_WEB_CLIENT_SECRET: ${DISCORD_WEB_CLIENT_SECRET}
+      OAUTH_SCOPES: ${OAUTH_SCOPES:-identify guilds}
+      WEB_ALLOWED_ORIGINS: ${WEB_ALLOWED_ORIGINS:-http://localhost:3000}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+      BOT_API_BASE_URL: http://bot:3001
+      API_RATE_LIMIT_MAX: ${API_RATE_LIMIT_MAX:-100}
+      API_RATE_LIMIT_WINDOW_MS: ${API_RATE_LIMIT_WINDOW_MS:-60000}
+    ports:
+      - "3000:3000"
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    name: bot-postgres-data
+  bot-logs:
+    name: bot-discord-logs

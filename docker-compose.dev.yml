@@ -1,0 +1,51 @@
+# Development override for docker-compose.
+#
+# Wires the source tree into the containers so we can iterate without
+# rebuilding the image every time.  Use:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# The override:
+#   * mounts the source tree read-write
+#   * runs the bot and web in dev mode (no production build)
+#   * runs prisma migrate on the web container's startup so the schema
+#     stays in sync with `packages/database/prisma/schema.prisma`
+
+services:
+  bot:
+    # Override the production target.  The `deps` stage leaves dev
+    # dependencies in place; we just need to run the dev script instead
+    # of the production start command.
+    build:
+      target: deps
+    command: ["npm", "run", "dev", "--workspace=@bot/bot"]
+    env_file: .env
+    environment:
+      NODE_ENV: development
+    volumes:
+      - .:/repo
+      - bot-logs:/app/logs
+      # Anonymous volumes to prevent the host's node_modules from
+      # overwriting the container's.
+      - /repo/node_modules
+      - /repo/apps/bot/node_modules
+      - /repo/packages/shared/node_modules
+      - /repo/packages/database/node_modules
+
+  web:
+    build:
+      target: dev
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      # The Next dev server reads .env automatically, but we make these
+      # explicit so the override is self-contained.
+      WEB_BASE_URL: http://localhost:3000
+    volumes:
+      - .:/repo
+      - /repo/node_modules
+      - /repo/apps/web/node_modules
+      - /repo/packages/shared/node_modules
+      - /repo/packages/database/node_modules
+    ports:
+      - "3000:3000"

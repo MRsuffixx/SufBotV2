@@ -141,6 +141,13 @@ model Session {
   /// Opaque, unguessable token presented as the cookie value.  We store the
   /// SHA-256 hash so a database leak does not grant access.
   tokenHash String   @unique
+  /// Encrypted Discord access token (AES-256-GCM).  Encoded as
+  /// base64(`iv || tag || ciphertext`).  The key is derived from
+  /// `SESSION_SECRET` in the web app, so a database-only leak does not
+  /// yield usable tokens.
+  accessTokenEnc String?
+  /// When the access token expires (Discord returns `expires_in`).
+  accessTokenExpiresAt DateTime?
   userAgent String?
   ipHash    String?
   expiresAt DateTime

@@ -204,11 +204,56 @@ Test files live next to the code they exercise (`foo.ts` → `foo.test.ts`).
 The full stack is deployed with Docker Compose. See [`docker-compose.yml`](docker-compose.yml).
 
 ```bash
-docker compose build
-docker compose up -d
+# 1. Copy and fill in the env file
+cp .env.example .env
+$EDITOR .env
+
+# 2. Build the images
+npm run docker:build      # alias for: docker compose build
+
+# 3. Start the stack (postgres + bot + web)
+npm run docker:up         # alias for: docker compose up -d
+
+# 4. Follow the logs
+npm run docker:logs
 ```
 
-Each app has its own `Dockerfile` (`apps/bot/Dockerfile`, `apps/web/Dockerfile`) that runs `tsc -b` and copies `dist/` into a slim Node image.
+Each app has its own `Dockerfile` (`apps/bot/Dockerfile`, `apps/web/Dockerfile`) that runs `tsc -b` and copies `dist/` into a slim Node image. The bot's container runs `prisma migrate deploy` automatically on startup.
+
+### Local development with Docker
+
+For an iterative loop without rebuilding images on every change, use the dev override:
+
+```bash
+npm run docker:dev:up     # mounts the source tree and runs dev servers
+```
+
+This combines `docker-compose.yml` with `docker-compose.dev.yml`.  The override:
+
+* mounts the repo into the containers,
+* runs the bot via `tsx watch` and the web via `next dev`,
+* keeps the database and the bot's internal API exposed only on the Docker network.
+
+### Health checks
+
+```bash
+npm run healthcheck       # probes postgres + bot API + web UI
+```
+
+The script exits non-zero if any service is unreachable, making it suitable for CI gates or local smoke tests.
+
+### Bringing it down
+
+```bash
+npm run docker:down                # stop services
+npm run docker:down && docker volume rm bot-postgres-data   # drop database
+```
+
+### Production tips
+
+* Put a reverse proxy (nginx, Caddy, or a managed load balancer) in front of the web service and terminate TLS there.  The Compose file does not expose Postgres to the host on purpose.
+* Rotate `INTERNAL_API_TOKEN` and `SESSION_SECRET` regularly; the bot refuses to start if they are missing.
+* Run `docker compose pull` and `docker compose up -d` behind a CI pipeline that runs `npm test` and `npm run typecheck` first.
 
 ---
 
