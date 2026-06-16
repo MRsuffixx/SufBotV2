@@ -1,0 +1,24 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "tsBuildInfoFile": "./.tsbuildinfo",
+    "types": ["node"],
+    "paths": {
+      "@bot/shared": ["../../packages/shared/dist/index.d.ts"],
+      "@bot/shared/*": ["../../packages/shared/dist/*"],
+      "@bot/database": ["../../packages/database/dist/index.d.ts"],
+      "@bot/database/*": ["../../packages/database/dist/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["src/**/*.test.ts", "vitest.config.ts", "vitest.setup.ts"],
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/database" }
+  ]
+}

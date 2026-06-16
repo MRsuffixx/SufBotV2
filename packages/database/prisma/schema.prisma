@@ -1,0 +1,153 @@
+// Prisma schema for the Discord bot ecosystem.
+// All identifiers use Discord snowflakes (BIGINT).  We keep them as String
+// columns (rather than BigInt) so that JSON serialization, querying and
+// cross-process communication stay simple and TypeScript-friendly.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------------------------------------------------------
+// Discord identity
+// --------------------------------------------------------------------------
+
+/// A Discord user that has interacted with the bot or logged into the
+/// dashboard.  One row per Discord user; metadata is refreshed on login.
+model User {
+  id           String   @id // Discord snowflake
+  username     String
+  discriminator String?
+  globalName   String?
+  avatarUrl    String?
+  email        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions     Session[]
+  auditLogs    AuditLog[] @relation("AuditActor")
+  warningsIssued Warning[] @relation("WarnIssuer")
+
+  @@index([username])
+}
+
+/// A Discord guild (server) the bot is a member of.
+model Guild {
+  id          String   @id // Discord snowflake
+  name        String
+  iconUrl     String?
+  memberCount Int      @default(0)
+  joinedAt    DateTime @default(now())
+  leftAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  settings    GuildSettings?
+  warnings    Warning[]
+  auditLogs   AuditLog[]
+
+  @@index([leftAt])
+}
+
+// --------------------------------------------------------------------------
+// Per-guild configuration
+// --------------------------------------------------------------------------
+
+/// One-to-one configuration for a guild.  Stored in its own table so that
+/// future additions (welcome messages, auto-mod, etc.) can be added without
+/// touching the Guild row.
+model GuildSettings {
+  guildId          String   @id
+  prefix           String   @default("!")
+  welcomeChannelId String?
+  logChannelId     String?
+  /// ISO 639-1 / BCP-47 code, restricted to SUPPORTED_LANGUAGES on the API.
+  language         String   @default("en")
+  /// Free-form JSON for forward-compatible feature flags.  Never trust it
+  /// from the API — it is sanitized in the service layer.
+  features         Json     @default("{}")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  guild            Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([language])
+}
+
+// --------------------------------------------------------------------------
+// Moderation
+// --------------------------------------------------------------------------
+
+model Warning {
+  id         String   @id @default(cuid())
+  guildId    String
+  userId     String
+  issuerId   String
+  reason     String
+  /// 0 = active, higher = more severe (e.g. escalation steps).
+  severity   Int      @default(0)
+  /// null until the warning is rescinded.
+  rescindedAt DateTime?
+  rescindedBy String?
+  createdAt  DateTime @default(now())
+
+  guild      Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  issuer     User     @relation("WarnIssuer", fields: [issuerId], references: [id])
+
+  @@index([guildId, userId])
+  @@index([guildId, createdAt])
+}
+
+// --------------------------------------------------------------------------
+// Observability
+// --------------------------------------------------------------------------
+
+/// Append-only audit log.  The `metadata` column is sanitized to avoid
+/// storing secrets or tokens.
+model AuditLog {
+  id         String   @id @default(cuid())
+  guildId    String?
+  actorId    String?
+  /// Stable, machine-readable action identifier (e.g. "settings.update").
+  action     String
+  /// Human-readable description, safe to surface in dashboards.
+  description String
+  metadata   Json     @default("{}")
+  /// Best-effort source — "bot", "web", "system".
+  source     String   @default("system")
+  createdAt  DateTime @default(now())
+
+  guild      Guild?   @relation(fields: [guildId], references: [id], onDelete: SetNull)
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([guildId, createdAt])
+  @@index([action])
+}
+
+// --------------------------------------------------------------------------
+// Web sessions
+// --------------------------------------------------------------------------
+
+/// HTTP session for a dashboard user.  We store a session token (hashed)
+/// rather than a full user record in the cookie.
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  /// Opaque, unguessable token presented as the cookie value.  We store the
+  /// SHA-256 hash so a database leak does not grant access.
+  tokenHash String   @unique
+  userAgent String?
+  ipHash    String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
