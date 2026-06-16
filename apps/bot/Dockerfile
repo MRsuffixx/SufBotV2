@@ -17,7 +17,9 @@ COPY tsconfig.base.json tsconfig.json ./
 COPY packages packages
 COPY apps/bot apps/bot
 RUN npm run db:generate
-RUN npm run build
+# Build only the bot workspace so the root `tsc -b` does not need the
+# web project to be present in the image.
+RUN npx tsc -b apps/bot
 
 # ----- Stage 3: install production-only deps (root-only is fine, npm
 # workspaces hoist everything) -----

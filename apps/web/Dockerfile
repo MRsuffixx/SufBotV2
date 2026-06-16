@@ -17,11 +17,10 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/database/package.json ./packages/database/
 COPY apps/web/package.json ./apps/web/
 
-# Install all workspace dependencies (including devDependencies for the
-# build stage below).  `--workspaces --include-workspace-root` ensures
-# every workspace has its own node_modules so the build commands can
-# resolve `tsc`, `next`, etc.
-RUN npm install --no-audit --no-fund --workspaces --include-workspace-root
+# Install all workspace dependencies (dev deps are required for the
+# Next build).  npm workspaces hoist everything to the root
+# `node_modules`; the per-workspace node_modules are NOT created.
+RUN npm install --no-audit --no-fund
 
 # Build the shared and database packages first (they are runtime deps
 # of the web app via the published artifacts).
@@ -30,10 +29,8 @@ COPY packages/database ./packages/database
 RUN npm run build --workspace=@bot/shared \
  && npm run build --workspace=@bot/database
 
-# Copy the web app source
+# Copy the web app source and build it
 COPY apps/web ./apps/web
-# Build from the root so `tsc -b` and `next build` see all the
-# project references and can resolve them via node_modules.
 RUN npm run build --workspace=@bot/web
 
 # ---------------------------------------------------------------------------
@@ -49,7 +46,7 @@ CMD ["npm", "run", "dev", "--workspace=@bot/web"]
 # built the Next app with NODE_ENV=production, so we only need to trim
 # devDependencies to shrink the image.
 FROM base AS prod-deps
-RUN npm prune --omit=dev --workspaces --include-workspace-root
+RUN npm prune --omit=dev
 
 # ---------------------------------------------------------------------------
 # Final stage
